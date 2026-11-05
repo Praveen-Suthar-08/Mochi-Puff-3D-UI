@@ -1,0 +1,2393 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mochi-Puff Fur</title>
+    <meta
+      name="description"
+      content="Interactive 3D WebGL2 layered shell fur creature studio with Kajiya-Kay hair shading, real-time combing physics, and procedural tuft styling."
+    />
+    <meta property="og:title" content="Mochi-Puff Fur" />
+    <meta
+      property="og:description"
+      content="Interactive 3D WebGL2 layered shell fur creature studio with Kajiya-Kay hair shading, real-time combing physics, and procedural tuft styling."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Required CDN Reference Declarations -->
+    <link rel="dns-prefetch" href="https://cloudflare.com" />
+    <link rel="dns-prefetch" href="https://jsdelivr.net" />
+    <link rel="stylesheet" href="/src/index.css" />
+
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #000000;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: #f4f4f5;
+      }
+
+      /* Custom Range Slider Styling matching reference UI */
+      input[type='range'].mochi-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 5px;
+        background: #272730;
+        border-radius: 999px;
+        outline: none;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      input[type='range'].mochi-slider:hover {
+        background: #343442;
+      }
+      input[type='range'].mochi-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: #ffd6e4;
+        border: 2px solid #ff82a9;
+        box-shadow: 0 0 10px rgba(255, 130, 169, 0.65);
+        cursor: pointer;
+        transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.12s ease;
+      }
+      input[type='range'].mochi-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.18);
+        background: #ffffff;
+      }
+      input[type='range'].mochi-slider::-moz-range-thumb {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: #ffd6e4;
+        border: 2px solid #ff82a9;
+        box-shadow: 0 0 10px rgba(255, 130, 169, 0.65);
+        cursor: pointer;
+        transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      /* Custom Color Swatch Input Styling */
+      input[type='color'].mochi-color {
+        -webkit-appearance: none;
+        appearance: none;
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        padding: 0;
+        background: transparent;
+        cursor: pointer;
+        overflow: hidden;
+      }
+      input[type='color'].mochi-color::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      input[type='color'].mochi-color::-webkit-color-swatch {
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 6px;
+      }
+
+      /* Subtle scrollbar for right control panel */
+      .mochi-scroll::-webkit-scrollbar {
+        width: 4px;
+      }
+      .mochi-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .mochi-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 999px;
+      }
+
+      /* Disable backdrop-blur only when software WebGL is active to prevent CPU composition stalls */
+      body.software-gl .glass-surface {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background-color: rgba(19, 19, 25, 0.96) !important;
+      }
+    </style>
+  </head>
+  <body class="relative w-screen h-screen overflow-hidden bg-black select-none" data-state="ready">
+    <!-- Full-Screen 3D WebGL Canvas Mount -->
+    <div
+      id="canvas-container"
+      data-testid="mochi-canvas-container"
+      class="fixed inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"
+    ></div>
+
+    <!-- AR View Spatial Reticle Overlay -->
+    <div
+      id="ar-overlay"
+      class="fixed inset-0 pointer-events-none z-[5] hidden items-center justify-center"
+      aria-hidden="true"
+    >
+      <div
+        class="w-[440px] h-[440px] rounded-full border border-cyan-400/25 flex items-center justify-center shadow-[0_0_60px_rgba(56,189,248,0.12)]"
+      >
+        <div class="w-[320px] h-[320px] rounded-full border border-dashed border-pink-400/30"></div>
+      </div>
+      <div class="fixed top-20 left-6 text-[11px] font-mono text-cyan-300/85 tracking-wider">
+        AR SPATIAL TRACKING · SURFACE LOCKED · 60Hz
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 1. TOP HEADER NAVIGATION                                              -->
+    <!-- ===================================================================== -->
+    <header class="fixed top-3.5 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
+      <!-- Top-Left Brand Pill Badge -->
+      <div
+        class="pointer-events-auto p-1 rounded-full bg-zinc-900/90 border border-white/10 shadow-xl glass-surface backdrop-blur-md"
+      >
+        <div
+          class="flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FF82A9] text-zinc-950 font-semibold text-xs tracking-tight shadow-sm whitespace-nowrap"
+        >
+          <span class="w-1.5 h-1.5 rounded-full bg-zinc-950/80 inline-block"></span>
+          <span>Mochi-Puff Fur</span>
+        </div>
+      </div>
+
+      <!-- Top-Center Environment & Engine Mode Pill Container -->
+      <nav
+        aria-label="Environment and Fur Engine Controls"
+        class="pointer-events-auto flex items-center gap-1 p-1.5 rounded-full bg-zinc-900/85 border border-white/10 shadow-2xl glass-surface backdrop-blur-md overflow-x-auto max-w-[calc(100vw-160px)]"
+      >
+        <button
+          type="button"
+          data-env="studio"
+          class="env-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 whitespace-nowrap bg-[#FFD1DF] text-zinc-950 shadow-sm cursor-pointer"
+        >
+          <span class="env-dot w-1.5 h-1.5 rounded-full bg-[#E11D74]"></span>
+          <span>Studio</span>
+        </button>
+
+        <button
+          type="button"
+          data-env="cloud"
+          class="env-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 whitespace-nowrap text-zinc-400 hover:text-zinc-100 cursor-pointer"
+        >
+          <span class="env-dot w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+          <span>Cloud Sky</span>
+        </button>
+
+        <button
+          type="button"
+          data-env="desk"
+          class="env-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 whitespace-nowrap text-zinc-400 hover:text-zinc-100 cursor-pointer"
+        >
+          <span class="env-dot w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+          <span>Cozy Desk</span>
+        </button>
+
+        <button
+          type="button"
+          data-env="ar"
+          class="env-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 whitespace-nowrap text-zinc-400 hover:text-zinc-100 cursor-pointer"
+        >
+          <span class="env-dot w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+          <span>AR View</span>
+        </button>
+
+        <div class="w-px h-4 bg-white/10 mx-1 shrink-0" aria-hidden="true"></div>
+
+        <!-- Cyan Toggle Button for WebGPU / WebGL Fur -->
+        <button
+          type="button"
+          id="btn-top-fur-mode"
+          aria-pressed="true"
+          class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 whitespace-nowrap bg-cyan-950/60 hover:bg-cyan-900/70 text-cyan-200 border border-cyan-400/35 shadow-sm cursor-pointer"
+        >
+          <span id="top-fur-mode-dot" class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+          <span id="top-fur-mode-label">WebGPU Fur: ON</span>
+        </button>
+      </nav>
+
+      <!-- Spacer to balance flex layout on desktop -->
+      <div class="hidden xl:block w-[130px]" aria-hidden="true"></div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- 2. RIGHT-SIDE CONTROL PANEL ("Materials & Lighting")                  -->
+    <!-- ===================================================================== -->
+    <aside
+      id="control-panel"
+      aria-label="Materials and Lighting Controls"
+      class="fixed top-14 md:top-3.5 right-3.5 z-20 w-[312px] max-w-[calc(100vw-28px)] max-h-[calc(100vh-110px)] md:max-h-[calc(100vh-28px)] flex flex-col rounded-[22px] bg-zinc-900/80 backdrop-blur-md glass-surface border border-white/10 shadow-2xl transition-all duration-200 overflow-hidden"
+    >
+      <!-- Sidebar Header -->
+      <div class="flex items-center justify-between px-4 py-3 border-b border-white/[0.07] shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#FF6B9D] inline-block"></span>
+          <h1 class="text-[14px] font-semibold tracking-tight text-white m-0">Materials &amp; Lighting</h1>
+        </div>
+        <button
+          type="button"
+          id="btn-collapse-panel"
+          aria-expanded="true"
+          aria-controls="panel-body"
+          class="px-3 py-1 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 border border-white/10 text-[11px] font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
+        >
+          Collapse
+        </button>
+      </div>
+
+      <!-- Scrollable Sidebar Body -->
+      <div id="panel-body" class="mochi-scroll overflow-y-auto px-4 py-3 space-y-3.5 text-xs">
+        <!-- GROUP 1: QUICK PRESETS -->
+        <section aria-labelledby="heading-presets" class="space-y-1.5">
+          <h2
+            id="heading-presets"
+            class="text-[10px] font-semibold tracking-wider text-zinc-400 uppercase m-0"
+          >
+            Quick Presets
+          </h2>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              data-preset="sakura"
+              class="preset-btn flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/85 hover:bg-zinc-700/80 border border-[#FF82A9]/60 text-white text-[11px] font-medium transition-all cursor-pointer truncate"
+            >
+              <span
+                class="w-2.5 h-2.5 rounded-full shrink-0"
+                style="background: linear-gradient(135deg, #3b00e3, #ff82a9)"
+              ></span>
+              <span class="truncate">Sakura Mochi</span>
+            </button>
+
+            <button
+              type="button"
+              data-preset="golden"
+              class="preset-btn flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/55 hover:bg-zinc-700/75 border border-white/10 text-zinc-200 text-[11px] font-medium transition-all cursor-pointer truncate"
+            >
+              <span
+                class="w-2.5 h-2.5 rounded-full shrink-0"
+                style="background: linear-gradient(135deg, #78350f, #ffd466)"
+              ></span>
+              <span class="truncate">Golden Fluff</span>
+            </button>
+
+            <button
+              type="button"
+              data-preset="midnight"
+              class="preset-btn flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/55 hover:bg-zinc-700/75 border border-white/10 text-zinc-200 text-[11px] font-medium transition-all cursor-pointer truncate"
+            >
+              <span
+                class="w-2.5 h-2.5 rounded-full shrink-0"
+                style="background: linear-gradient(135deg, #1e1b4b, #38bdf8)"
+              ></span>
+              <span class="truncate">Midnight Velvet</span>
+            </button>
+
+            <button
+              type="button"
+              data-preset="matcha"
+              class="preset-btn flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/55 hover:bg-zinc-700/75 border border-white/10 text-zinc-200 text-[11px] font-medium transition-all cursor-pointer truncate"
+            >
+              <span
+                class="w-2.5 h-2.5 rounded-full shrink-0"
+                style="background: linear-gradient(135deg, #14532d, #98f5b4)"
+              ></span>
+              <span class="truncate">Matcha Puff</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- MOOD EXPRESSIONS SELECTOR -->
+        <section aria-labelledby="heading-moods" class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <h2
+              id="heading-moods"
+              class="text-[10px] font-semibold tracking-wider text-zinc-400 uppercase m-0"
+            >
+              Mood Expression
+            </h2>
+            <span id="val-mood-status" class="text-[10px] text-pink-300/90 font-medium">Eye-Tracking ON</span>
+          </div>
+          <div class="grid grid-cols-4 gap-1">
+            <button
+              type="button"
+              data-mood="calm"
+              class="mood-btn py-1.5 px-1.5 rounded-xl text-[10.5px] font-semibold border transition-all cursor-pointer bg-[#3B1D31]/85 border-[#FF82A9]/60 text-white text-center truncate"
+            >
+              Calm
+            </button>
+            <button
+              type="button"
+              data-mood="happy"
+              class="mood-btn py-1.5 px-1.5 rounded-xl text-[10.5px] font-medium border transition-all cursor-pointer bg-zinc-800/55 border-white/10 text-zinc-300 hover:text-white text-center truncate"
+            >
+              Happy
+            </button>
+            <button
+              type="button"
+              data-mood="sleepy"
+              class="mood-btn py-1.5 px-1.5 rounded-xl text-[10.5px] font-medium border transition-all cursor-pointer bg-zinc-800/55 border-white/10 text-zinc-300 hover:text-white text-center truncate"
+            >
+              Sleepy
+            </button>
+            <button
+              type="button"
+              data-mood="starry"
+              class="mood-btn py-1.5 px-1.5 rounded-xl text-[10.5px] font-medium border transition-all cursor-pointer bg-zinc-800/55 border-white/10 text-zinc-300 hover:text-white text-center truncate"
+            >
+              Starry
+            </button>
+          </div>
+        </section>
+
+        <div class="h-px bg-white/[0.07]"></div>
+
+        <!-- GROUP 2: COAT MATERIALS & GROUP 3: FUR CONFIGURATION -->
+        <section aria-labelledby="heading-coat" class="space-y-2.5">
+          <h2 id="heading-coat" class="text-[10px] font-semibold tracking-wider text-zinc-400 uppercase m-0">
+            Coat Materials
+          </h2>
+
+          <div class="grid grid-cols-2 gap-2" role="tablist" aria-label="Coat Materials">
+            <button
+              type="button"
+              id="tab-webgpu"
+              role="tab"
+              aria-selected="true"
+              data-coat-mode="webgpu"
+              class="coat-tab py-1.5 px-2.5 rounded-xl text-[11px] font-medium border transition-all cursor-pointer bg-[#3B1D31]/85 border-[#FF82A9]/60 text-white shadow-sm"
+            >
+              WebGPU (Default)
+            </button>
+            <button
+              type="button"
+              id="tab-webgl"
+              role="tab"
+              aria-selected="false"
+              data-coat-mode="webgl"
+              class="coat-tab py-1.5 px-2.5 rounded-xl text-[11px] font-medium border transition-all cursor-pointer bg-zinc-800/55 border-white/10 text-zinc-300 hover:text-white"
+            >
+              WebGL
+            </button>
+          </div>
+
+          <!-- Fur Configuration Sliders -->
+          <div class="space-y-2 pt-0.5">
+            <!-- Fur Length -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <label for="slider-fur-length" class="font-medium text-zinc-200">Fur Length</label>
+                <span id="val-fur-length" class="text-zinc-400 tabular-nums font-mono text-[11px]">
+                  0.62" (16 mm)
+                </span>
+              </div>
+              <input
+                id="slider-fur-length"
+                type="range"
+                min="0.1"
+                max="1.5"
+                step="0.01"
+                value="0.62"
+                class="mochi-slider"
+              />
+            </div>
+
+            <!-- Fur Density -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <label for="slider-fur-density" class="font-medium text-zinc-200">Fur Density</label>
+                <span id="val-fur-density" class="text-zinc-400 tabular-nums font-mono text-[11px]">
+                  75% (45k)
+                </span>
+              </div>
+              <input
+                id="slider-fur-density"
+                type="range"
+                min="10"
+                max="100"
+                step="1"
+                value="75"
+                class="mochi-slider"
+              />
+            </div>
+
+            <!-- Curl / Waviness -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <label for="slider-curl" class="font-medium text-zinc-200">Curl / Waviness</label>
+                <span id="val-curl" class="text-zinc-400 tabular-nums font-mono text-[11px]">23%</span>
+              </div>
+              <input
+                id="slider-curl"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="23"
+                class="mochi-slider"
+              />
+            </div>
+
+            <!-- Tuft Clumping -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <label for="slider-clumping" class="font-medium text-zinc-200">Tuft Clumping</label>
+                <span id="val-clumping" class="text-zinc-400 tabular-nums font-mono text-[11px]">35%</span>
+              </div>
+              <input
+                id="slider-clumping"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="35"
+                class="mochi-slider"
+              />
+            </div>
+          </div>
+        </section>
+
+        <div class="h-px bg-white/[0.07]"></div>
+
+        <!-- GROUP 4: PHYSICAL HAIR SHADING -->
+        <section aria-labelledby="heading-shading" class="space-y-2">
+          <h2
+            id="heading-shading"
+            class="text-[10px] font-semibold tracking-wider text-zinc-400 uppercase m-0"
+          >
+            Physical Hair Shading
+          </h2>
+
+          <div class="grid grid-cols-2 gap-2">
+            <label
+              for="color-root"
+              class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-zinc-800/55 border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+            >
+              <span class="text-[11px] font-medium text-zinc-200">Root Color</span>
+              <input id="color-root" type="color" value="#3B00E3" class="mochi-color" />
+            </label>
+
+            <label
+              for="color-tip"
+              class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-zinc-800/55 border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+            >
+              <span class="text-[11px] font-medium text-zinc-200">Tip Color</span>
+              <input id="color-tip" type="color" value="#FF82A9" class="mochi-color" />
+            </label>
+          </div>
+
+          <!-- Roughness -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[11px]">
+              <label for="slider-roughness" class="font-medium text-zinc-200">Roughness</label>
+              <span id="val-roughness" class="text-zinc-400 tabular-nums font-mono text-[11px]">0.77</span>
+            </div>
+            <input
+              id="slider-roughness"
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.01"
+              value="0.77"
+              class="mochi-slider"
+            />
+          </div>
+
+          <!-- Specular -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[11px]">
+              <label for="slider-specular" class="font-medium text-zinc-200">Specular</label>
+              <span id="val-specular" class="text-zinc-400 tabular-nums font-mono text-[11px]">0.24</span>
+            </div>
+            <input
+              id="slider-specular"
+              type="range"
+              min="0.0"
+              max="1.0"
+              step="0.01"
+              value="0.24"
+              class="mochi-slider"
+            />
+          </div>
+        </section>
+
+        <div class="h-px bg-white/[0.07]"></div>
+
+        <!-- GROUP 5: LIGHTING & WIND -->
+        <section aria-labelledby="heading-lighting" class="space-y-2">
+          <h2
+            id="heading-lighting"
+            class="text-[10px] font-semibold tracking-wider text-zinc-400 uppercase m-0"
+          >
+            Lighting &amp; Wind
+          </h2>
+
+          <label
+            for="color-keylight"
+            class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-zinc-800/55 border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+          >
+            <span class="text-[11px] font-medium text-zinc-200">Key Light Color</span>
+            <input id="color-keylight" type="color" value="#FFFFFF" class="mochi-color" />
+          </label>
+
+          <!-- Key Light Angle -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[11px]">
+              <label for="slider-light-angle" class="font-medium text-zinc-200">Key Light Angle</label>
+              <span id="val-light-angle" class="text-zinc-400 tabular-nums font-mono text-[11px]">-74°</span>
+            </div>
+            <input
+              id="slider-light-angle"
+              type="range"
+              min="-180"
+              max="180"
+              step="1"
+              value="-74"
+              class="mochi-slider"
+            />
+          </div>
+
+          <!-- Key Intensity -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[11px]">
+              <label for="slider-key-intensity" class="font-medium text-zinc-200">Key Intensity</label>
+              <span id="val-key-intensity" class="text-zinc-400 tabular-nums font-mono text-[11px]">1.35</span>
+            </div>
+            <input
+              id="slider-key-intensity"
+              type="range"
+              min="0.0"
+              max="3.0"
+              step="0.01"
+              value="1.35"
+              class="mochi-slider"
+            />
+          </div>
+
+          <!-- Rim Scatter -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[11px]">
+              <label for="slider-rim-scatter" class="font-medium text-zinc-200">Rim Scatter</label>
+              <span id="val-rim-scatter" class="text-zinc-400 tabular-nums font-mono text-[11px]">1.35</span>
+            </div>
+            <input
+              id="slider-rim-scatter"
+              type="range"
+              min="0.0"
+              max="3.0"
+              step="0.01"
+              value="1.35"
+              class="mochi-slider"
+            />
+          </div>
+
+          <!-- Wind Breeze -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-[11px]">
+              <label for="slider-wind" class="font-medium text-zinc-200">Wind Breeze</label>
+              <span id="val-wind" class="text-zinc-400 tabular-nums font-mono text-[11px]">0.95</span>
+            </div>
+            <input
+              id="slider-wind"
+              type="range"
+              min="0.0"
+              max="2.0"
+              step="0.01"
+              value="0.95"
+              class="mochi-slider"
+            />
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- 3. BOTTOM CAPTION PANEL                                               -->
+    <!-- ===================================================================== -->
+    <footer class="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none max-w-[92vw]">
+      <div
+        id="bottom-caption"
+        class="pointer-events-auto px-5 py-2 rounded-full bg-zinc-900/85 border border-white/10 text-[11.5px] font-medium text-zinc-300 shadow-2xl glass-surface backdrop-blur-md whitespace-nowrap truncate"
+      >
+        Drag across Mochi-Puff to pet &amp; comb fur · Click creature to boop · Orbit with mouse
+      </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- 4. THREE.JS 3D ENGINE, 40-SHELL IRIDESCENT FUR & PARTICLE STUDIO      -->
+    <!-- ===================================================================== -->
+    <script type="module">
+      import * as THREE from 'three';
+      import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+      import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+      import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+      // -----------------------------------------------------------------------
+      // Self-Contained Presets, Mood Configurations & Pure Physics Helpers
+      // -----------------------------------------------------------------------
+      const FUR_PRESETS = {
+        sakura: {
+          id: 'sakura',
+          name: 'Sakura Mochi',
+          rootColor: '#3B00E3',
+          tipColor: '#FF82A9',
+          furLength: 0.62,
+          furDensity: 75,
+          curl: 23,
+          clumping: 35,
+          roughness: 0.77,
+          specular: 0.24,
+          rimScatter: 1.35,
+        },
+        golden: {
+          id: 'golden',
+          name: 'Golden Fluff',
+          rootColor: '#5C2400',
+          tipColor: '#FFD466',
+          furLength: 0.72,
+          furDensity: 82,
+          curl: 18,
+          clumping: 42,
+          roughness: 0.68,
+          specular: 0.34,
+          rimScatter: 1.55,
+        },
+        midnight: {
+          id: 'midnight',
+          name: 'Midnight Velvet',
+          rootColor: '#0A0E2E',
+          tipColor: '#5CE1E6',
+          furLength: 0.54,
+          furDensity: 88,
+          curl: 12,
+          clumping: 28,
+          roughness: 0.62,
+          specular: 0.42,
+          rimScatter: 1.75,
+        },
+        matcha: {
+          id: 'matcha',
+          name: 'Matcha Puff',
+          rootColor: '#11381F',
+          tipColor: '#98F5B4',
+          furLength: 0.66,
+          furDensity: 78,
+          curl: 30,
+          clumping: 38,
+          roughness: 0.74,
+          specular: 0.26,
+          rimScatter: 1.4,
+        },
+      };
+
+      const MOOD_CONFIGS = {
+        calm: {
+          id: 'calm',
+          label: 'Calm',
+          eyeScaleY: 1.0,
+          eyeScaleX: 1.0,
+          blushOpacity: 0.65,
+          earWiggleAmp: 0.025,
+          earWiggleFreq: 2.2,
+          starCatchlight: false,
+          happyArc: false,
+        },
+        happy: {
+          id: 'happy',
+          label: 'Happy',
+          eyeScaleY: 0.96,
+          eyeScaleX: 1.06,
+          blushOpacity: 0.95,
+          earWiggleAmp: 0.095,
+          earWiggleFreq: 5.8,
+          starCatchlight: false,
+          happyArc: true,
+        },
+        sleepy: {
+          id: 'sleepy',
+          label: 'Sleepy',
+          eyeScaleY: 0.25,
+          eyeScaleX: 1.05,
+          blushOpacity: 0.52,
+          earWiggleAmp: 0.01,
+          earWiggleFreq: 1.1,
+          starCatchlight: false,
+          happyArc: false,
+        },
+        starry: {
+          id: 'starry',
+          label: 'Starry-Eyed',
+          eyeScaleY: 1.1,
+          eyeScaleX: 1.08,
+          blushOpacity: 0.9,
+          earWiggleAmp: 0.075,
+          earWiggleFreq: 4.8,
+          starCatchlight: true,
+          happyArc: false,
+        },
+      };
+
+      function formatFurLengthLabel(inches) {
+        const clamped = Math.max(0.1, Math.min(1.5, inches));
+        const mm = Math.round(clamped * 25.4);
+        return `${clamped.toFixed(2)}" (${mm} mm)`;
+      }
+
+      function formatFurDensityLabel(percent) {
+        const clamped = Math.max(10, Math.min(100, Math.round(percent)));
+        const kStrands = Math.round(clamped * 0.6);
+        return `${clamped}% (${kStrands}k)`;
+      }
+
+      function stepBoopSpring(state, dt, stiffness = 180, damping = 11) {
+        const safeDt = Math.min(Math.max(dt, 0), 0.05);
+        const force = -stiffness * state.displacement - damping * state.velocity;
+        const velocity = state.velocity + force * safeDt;
+        const displacement = state.displacement + velocity * safeDt;
+        const scaleY = 1.0 - displacement * 0.28;
+        const scaleXZ = 1.0 + displacement * 0.16;
+        return {
+          state: { displacement, velocity },
+          scale: [scaleXZ, scaleY, scaleXZ],
+        };
+      }
+
+      function computeKeyLightDirection(angleDegrees) {
+        const rad = (angleDegrees * Math.PI) / 180;
+        const elevation = 0.52;
+        const cosEl = Math.cos(elevation);
+        const x = Math.sin(rad) * cosEl;
+        const y = Math.sin(elevation) + 0.35;
+        const z = Math.cos(rad) * cosEl;
+        const len = Math.hypot(x, y, z) || 1;
+        return [x / len, y / len, z / len];
+      }
+
+      function updateCombVector(current, dragDeltaX, dragDeltaY, maxMagnitude = 1.0) {
+        const nextX = current[0] * 0.92 + dragDeltaX * 0.45;
+        const nextY = current[1] * 0.92 - dragDeltaY * 0.45;
+        const nextZ = current[2] * 0.92;
+        const mag = Math.hypot(nextX, nextY, nextZ);
+        if (mag > maxMagnitude && mag > 0) {
+          const s = maxMagnitude / mag;
+          return [nextX * s, nextY * s, nextZ * s];
+        }
+        return [nextX, nextY, nextZ];
+      }
+
+      function computeEyeGazeOffset(ndcX, ndcY, maxOffset = 0.055) {
+        const clampedX = Math.max(-1, Math.min(1, ndcX));
+        const clampedY = Math.max(-1, Math.min(1, ndcY));
+        return [clampedX * maxOffset, clampedY * maxOffset * 0.85];
+      }
+
+      function computeBloomParameters(rimScatter, coatMode = 0.0) {
+        const clampedRim = Math.max(0.0, Math.min(3.0, rimScatter));
+        const modeMultiplier = coatMode < 0.5 ? 1.0 : 0.72;
+        const strength = Number((clampedRim * 0.16 * modeMultiplier).toFixed(3));
+        const radius = Number((0.36 + (clampedRim / 3.0) * 0.18 * modeMultiplier).toFixed(3));
+        const threshold = 0.95;
+        return { strength, radius, threshold };
+      }
+
+      // -----------------------------------------------------------------------
+      // Software WebGL Detection (ensures smooth headless & GPU performance)
+      // -----------------------------------------------------------------------
+      const isSoftwareGl = (() => {
+        try {
+          const probeCanvas = document.createElement('canvas');
+          const gl = probeCanvas.getContext('webgl2') || probeCanvas.getContext('webgl');
+          if (!gl) return true;
+          const ext = gl.getExtension('WEBGL_debug_renderer_info');
+          const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
+          const gpu = String(gl.getParameter(param));
+          gl.getExtension('WEBGL_lose_context')?.loseContext();
+          return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+        } catch {
+          return false;
+        }
+      })();
+
+      if (isSoftwareGl) {
+        document.body.classList.add('software-gl');
+      }
+
+      // -----------------------------------------------------------------------
+      // Scene, Camera & WebGLRenderer Initialization
+      // -----------------------------------------------------------------------
+      const container = document.getElementById('canvas-container');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        100
+      );
+      const initialCamX = window.innerWidth < 768 ? 0.0 : 0.34;
+      camera.position.set(initialCamX, 0.05, 7.15);
+      const cameraLookTarget = new THREE.Vector3(initialCamX, -0.02, 0.0);
+      camera.lookAt(cameraLookTarget);
+
+      const renderer = new THREE.WebGLRenderer({
+        alpha: false,
+        antialias: !isSoftwareGl,
+        powerPreference: 'high-performance',
+      });
+      const pixelRatio = isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(pixelRatio);
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+      renderer.toneMapping = THREE.NoToneMapping;
+      renderer.setClearColor(0x000000, 1.0);
+      container.appendChild(renderer.domElement);
+
+      // -----------------------------------------------------------------------
+      // High-Performance Post-Processing Pipeline: EffectComposer + UnrealBloomPass
+      // -----------------------------------------------------------------------
+      const bloomTarget = new THREE.WebGLRenderTarget(
+        window.innerWidth * pixelRatio,
+        window.innerHeight * pixelRatio,
+        {
+          type: THREE.HalfFloatType,
+          format: THREE.RGBAFormat,
+          samples: isSoftwareGl ? 0 : 4,
+        }
+      );
+      const composer = new EffectComposer(renderer, bloomTarget);
+      composer.setPixelRatio(pixelRatio);
+      composer.setSize(window.innerWidth, window.innerHeight);
+
+      const renderScenePass = new RenderPass(scene, camera);
+      composer.addPass(renderScenePass);
+
+      const initialBloom = computeBloomParameters(1.35, 0.0);
+      const bloomResolutionScale = isSoftwareGl ? 0.5 : 1.0;
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(
+          Math.max(1, Math.floor(window.innerWidth * bloomResolutionScale)),
+          Math.max(1, Math.floor(window.innerHeight * bloomResolutionScale))
+        ),
+        initialBloom.strength,
+        initialBloom.radius,
+        initialBloom.threshold
+      );
+      if (bloomPass._basic) {
+        bloomPass._basic.toneMapped = false;
+      }
+      composer.addPass(bloomPass);
+
+      function syncBloomPass() {
+        const params = computeBloomParameters(sharedState.rimScatter, sharedState.coatMode);
+        bloomPass.strength = params.strength;
+        bloomPass.radius = params.radius;
+        bloomPass.threshold = params.threshold;
+      }
+
+      // -----------------------------------------------------------------------
+      // Soft Volumetric Aura Bloom Backdrop (Dynamic Color-Matched Halo)
+      // -----------------------------------------------------------------------
+      const bloomCanvas = document.createElement('canvas');
+      bloomCanvas.width = 256;
+      bloomCanvas.height = 256;
+      const bloomCtx = bloomCanvas.getContext('2d');
+      const bloomTexture = new THREE.CanvasTexture(bloomCanvas);
+      bloomTexture.colorSpace = THREE.SRGBColorSpace;
+
+      function updateBloomHaloTexture(rootHex, tipHex) {
+        if (!bloomCtx) return;
+        bloomCtx.clearRect(0, 0, 256, 256);
+        const grad = bloomCtx.createRadialGradient(128, 128, 12, 128, 128, 125);
+        grad.addColorStop(0.0, tipHex + '66');
+        grad.addColorStop(0.42, rootHex + '44');
+        grad.addColorStop(0.75, tipHex + '18');
+        grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+        bloomCtx.fillStyle = grad;
+        bloomCtx.fillRect(0, 0, 256, 256);
+        bloomTexture.needsUpdate = true;
+      }
+      updateBloomHaloTexture('#3B00E3', '#FF82A9');
+
+      const bloomSpriteMat = new THREE.SpriteMaterial({
+        map: bloomTexture,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        opacity: 0.42,
+      });
+      const bloomSprite = new THREE.Sprite(bloomSpriteMat);
+      bloomSprite.scale.set(6.4, 5.8, 1.0);
+      bloomSprite.position.set(0.0, 0.05, -1.1);
+      scene.add(bloomSprite);
+
+      // -----------------------------------------------------------------------
+      // Detailed 3D Environment Stages (Studio, Cloud Sky, Cozy Desk, AR View)
+      // -----------------------------------------------------------------------
+      const stageStudioGroup = new THREE.Group();
+      const stageCloudGroup = new THREE.Group();
+      const stageDeskGroup = new THREE.Group();
+      const stageArGroup = new THREE.Group();
+      scene.add(stageStudioGroup, stageCloudGroup, stageDeskGroup, stageArGroup);
+
+      // 1. Studio Stage: Pitch-black backdrop so bottom fur tips glow seamlessly
+      const studioFloorGeo = new THREE.RingGeometry(1.45, 2.35, 64);
+      const studioFloorMat = new THREE.MeshBasicMaterial({
+        color: 0x3b00e3,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.0,
+        depthWrite: false,
+      });
+      const studioFloorRing = new THREE.Mesh(studioFloorGeo, studioFloorMat);
+      studioFloorRing.rotation.x = -Math.PI / 2;
+      studioFloorRing.position.set(0, -1.58, 0);
+      studioFloorRing.visible = false;
+      stageStudioGroup.add(studioFloorRing);
+
+      // 2. Cloud Sky Stage: Sculpted 3D Fluffy Twilight Cloud Islands
+      const cloudPuffMat = new THREE.MeshStandardMaterial({
+        color: 0xf5d0fe,
+        emissive: 0x3b0764,
+        emissiveIntensity: 0.35,
+        roughness: 0.85,
+        metalness: 0.05,
+      });
+      const cloudSpecs = [
+        [0.0, -1.72, -0.1, 1.45, 0.42, 1.15],
+        [-1.15, -1.62, 0.25, 0.88, 0.45, 0.82],
+        [1.18, -1.6, 0.2, 0.92, 0.46, 0.85],
+        [-0.55, -1.58, 0.65, 0.72, 0.36, 0.68],
+        [0.62, -1.56, 0.62, 0.75, 0.38, 0.68],
+        [-2.45, 0.95, -2.2, 0.75, 0.38, 0.55],
+        [2.65, 1.15, -2.4, 0.82, 0.42, 0.6],
+      ];
+      cloudSpecs.forEach(([x, y, z, sx, sy, sz]) => {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(1.0, 24, 20), cloudPuffMat);
+        puff.position.set(x, y, z);
+        puff.scale.set(sx, sy, sz);
+        stageCloudGroup.add(puff);
+      });
+      stageCloudGroup.visible = false;
+
+      // 3. Cozy Desk Stage: Warm Wood Tabletop, Pastel Lamp & Matcha Cup
+      const woodDeskMat = new THREE.MeshStandardMaterial({
+        color: 0x361e15,
+        roughness: 0.55,
+        metalness: 0.08,
+      });
+      const deskSurface = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 3.8, 0.16, 48), woodDeskMat);
+      deskSurface.position.set(0, -1.66, 0);
+      stageDeskGroup.add(deskSurface);
+
+      // Soft warm mat under Mochi-Puff
+      const coasterMat = new THREE.MeshStandardMaterial({
+        color: 0xfbcfe8,
+        roughness: 0.85,
+      });
+      const deskCoaster = new THREE.Mesh(new THREE.CylinderGeometry(1.85, 1.9, 0.03, 48), coasterMat);
+      deskCoaster.position.set(0, -1.56, 0);
+      stageDeskGroup.add(deskCoaster);
+
+      // Miniature Ceramic Matcha Mug on the left side of the desk
+      const mugGroup = new THREE.Group();
+      mugGroup.position.set(-2.15, -1.32, 0.55);
+      const mugBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.24, 0.52, 24),
+        new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.25 })
+      );
+      const matchaLiquid = new THREE.Mesh(
+        new THREE.CircleGeometry(0.25, 24),
+        new THREE.MeshBasicMaterial({ color: 0x4ade80 })
+      );
+      matchaLiquid.rotation.x = -Math.PI / 2;
+      matchaLiquid.position.y = 0.24;
+      mugGroup.add(mugBody, matchaLiquid);
+      stageDeskGroup.add(mugGroup);
+
+      // Warm Pastel Desk Lamp arch on the back-left (framed cleanly outside the ear silhouette)
+      const lampStem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.07, 2.7, 16),
+        new THREE.MeshStandardMaterial({ color: 0xfde68a, metalness: 0.6, roughness: 0.3 })
+      );
+      lampStem.position.set(-2.95, -0.25, -1.35);
+      const lampShade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.52, 0.46, 24),
+        new THREE.MeshStandardMaterial({
+          color: 0xff82a9,
+          emissive: 0xffb3c6,
+          emissiveIntensity: 0.45,
+          roughness: 0.4,
+        })
+      );
+      lampShade.position.set(-2.65, 1.08, -1.1);
+      lampShade.rotation.z = -0.45;
+      stageDeskGroup.add(lampStem, lampShade);
+      stageDeskGroup.visible = false;
+
+      // 4. AR View Stage: 3D Holographic Calibration Rings
+      const arOuterRing = new THREE.Mesh(
+        new THREE.RingGeometry(2.05, 2.12, 64),
+        new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.55,
+        })
+      );
+      arOuterRing.rotation.x = -Math.PI / 2;
+      arOuterRing.position.set(0, -1.55, 0);
+      const arInnerRing = new THREE.Mesh(
+        new THREE.RingGeometry(1.45, 1.49, 48),
+        new THREE.MeshBasicMaterial({
+          color: 0xff82a9,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.45,
+        })
+      );
+      arInnerRing.rotation.x = -Math.PI / 2;
+      arInnerRing.position.set(0, -1.54, 0);
+      stageArGroup.add(arOuterRing, arInnerRing);
+      stageArGroup.visible = false;
+
+      // -----------------------------------------------------------------------
+      // Floating Firefly Motes, Drifting Sakura Petals & Boop Particle Bursts
+      // -----------------------------------------------------------------------
+      // 1. Ambient Firefly & Starlight Dust
+      const dustCount = 120;
+      const dustGeo = new THREE.BufferGeometry();
+      const dustPositions = new Float32Array(dustCount * 3);
+      const dustColors = new Float32Array(dustCount * 3);
+      const dustPhases = new Float32Array(dustCount);
+
+      for (let i = 0; i < dustCount; i++) {
+        dustPositions[i * 3] = (Math.random() - 0.5) * 16.0;
+        dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 11.0;
+        dustPositions[i * 3 + 2] = -2.5 - Math.random() * 7.5;
+        dustPhases[i] = Math.random() * Math.PI * 2;
+
+        // Mix soft sakura pink, warm gold firefly, and crisp white starlight
+        const cPick = Math.random();
+        if (cPick < 0.4) {
+          dustColors[i * 3] = 1.0;
+          dustColors[i * 3 + 1] = 0.68;
+          dustColors[i * 3 + 2] = 0.85;
+        } else if (cPick < 0.7) {
+          dustColors[i * 3] = 1.0;
+          dustColors[i * 3 + 1] = 0.92;
+          dustColors[i * 3 + 2] = 0.55;
+        } else {
+          dustColors[i * 3] = 0.85;
+          dustColors[i * 3 + 1] = 0.95;
+          dustColors[i * 3 + 2] = 1.0;
+        }
+      }
+      dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+      dustGeo.setAttribute('color', new THREE.BufferAttribute(dustColors, 3));
+      const dustMat = new THREE.PointsMaterial({
+        size: isSoftwareGl ? 2.2 : 2.0,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.42,
+        sizeAttenuation: false,
+      });
+      const dustParticles = new THREE.Points(dustGeo, dustMat);
+      scene.add(dustParticles);
+
+      // 2. Drifting 3D Sakura Petals (InstancedMesh for zero draw-call overhead)
+      const PETAL_COUNT = 28;
+      const petalGeo = new THREE.CircleGeometry(0.055, 6);
+      petalGeo.scale(1.45, 0.82, 1.0);
+      const petalMat = new THREE.MeshBasicMaterial({
+        color: 0xffb3d1,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.68,
+      });
+      const petalInstanced = new THREE.InstancedMesh(petalGeo, petalMat, PETAL_COUNT);
+      petalInstanced.frustumCulled = false;
+      scene.add(petalInstanced);
+
+      const petalData = [];
+      const dummyObj = new THREE.Object3D();
+      for (let i = 0; i < PETAL_COUNT; i++) {
+        petalData.push({
+          x: (Math.random() - 0.5) * 9.5,
+          y: (Math.random() - 0.5) * 6.5,
+          z: (Math.random() - 0.5) * 4.0 - 0.5,
+          vx: 0.22 + Math.random() * 0.25,
+          vy: -0.18 - Math.random() * 0.2,
+          rx: Math.random() * Math.PI,
+          ry: Math.random() * Math.PI,
+          rz: Math.random() * Math.PI,
+          spin: 0.8 + Math.random() * 1.5,
+          phase: Math.random() * Math.PI * 2,
+          scale: 0.65 + Math.random() * 0.65,
+        });
+      }
+
+      // 3. Interactive Boop & Pet Particle Burst Pool (Radial Halo Sparkles)
+      const BURST_MAX = 32;
+      const burstGeo = new THREE.SphereGeometry(0.032, 8, 8);
+      const burstMat = new THREE.MeshBasicMaterial({
+        color: 0xffd6e7,
+        transparent: true,
+        opacity: 0.92,
+      });
+      const burstInstanced = new THREE.InstancedMesh(burstGeo, burstMat, BURST_MAX);
+      burstInstanced.frustumCulled = false;
+      scene.add(burstInstanced);
+
+      const burstParticles = [];
+      for (let i = 0; i < BURST_MAX; i++) {
+        burstParticles.push({
+          active: false,
+          x: 0,
+          y: 0,
+          z: 0,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          life: 0,
+          maxLife: 1.0,
+          scale: 0,
+        });
+        dummyObj.scale.set(0, 0, 0);
+        dummyObj.updateMatrix();
+        burstInstanced.setMatrixAt(i, dummyObj.matrix);
+      }
+      burstInstanced.instanceMatrix.needsUpdate = true;
+
+      function spawnBoopBurst(originWorld, count = 18) {
+        let spawned = 0;
+        for (let i = 0; i < BURST_MAX && spawned < count; i++) {
+          const p = burstParticles[i];
+          if (!p.active || p.life <= 0.1) {
+            p.active = true;
+            const angle = (spawned / Math.max(1, count)) * Math.PI * 2 + Math.random() * 0.35;
+            const haloRadius = 1.65 + Math.random() * 0.45;
+            p.x = Math.cos(angle) * haloRadius;
+            p.y = Math.sin(angle) * haloRadius * 0.85;
+            p.z = 0.25 + (Math.random() - 0.5) * 0.4;
+            const speed = 1.1 + Math.random() * 1.4;
+            p.vx = Math.cos(angle) * speed;
+            p.vy = Math.sin(angle) * speed + 0.45;
+            p.vz = (Math.random() - 0.5) * 0.6;
+            p.maxLife = 0.6 + Math.random() * 0.35;
+            p.life = p.maxLife;
+            p.scale = 0.75 + Math.random() * 0.55;
+            spawned++;
+          }
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // Core Creature Geometry: Sculpted Organic Mochi-Puff with Ears & Cheeks
+      // -----------------------------------------------------------------------
+      function createMochiBodyGeometry() {
+        const segW = isSoftwareGl ? 76 : 112;
+        const segH = isSoftwareGl ? 60 : 84;
+        const geo = new THREE.SphereGeometry(1.56, segW, segH);
+        const pos = geo.attributes.position;
+        const v = new THREE.Vector3();
+
+        const leftEarDir = new THREE.Vector3(-0.48, 0.85, 0.06).normalize();
+        const rightEarDir = new THREE.Vector3(0.48, 0.85, 0.06).normalize();
+        const topCenterDir = new THREE.Vector3(0.0, 1.0, 0.05).normalize();
+
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          const dir = v.clone().normalize();
+
+          // 1. Pear / Mochi chubby cheek widening around lower-middle Y (-0.50 to +0.20)
+          const cheekBand = Math.exp(-Math.pow((dir.y + 0.14) / 0.44, 2.0));
+          const xSpread = 1.0 + 0.36 * cheekBand;
+          const zSpread = 1.0 + 0.16 * cheekBand;
+
+          v.x *= xSpread;
+          v.z *= zSpread;
+          v.y *= 0.88;
+
+          // 2. Flatten bottom slightly so Mochi sits like a soft bun
+          if (dir.y < -0.42) {
+            const bottomFactor = Math.pow((-dir.y - 0.42) / 0.58, 1.45);
+            v.y += bottomFactor * 0.28;
+          }
+
+          // 3. Sculpt two distinct top ear tufts with a central dip (matching reference silhouette)
+          const dotL = Math.max(0.0, dir.dot(leftEarDir));
+          const dotR = Math.max(0.0, dir.dot(rightEarDir));
+          const dotCenter = Math.max(0.0, dir.dot(topCenterDir));
+          const earL = Math.pow(dotL, 8.5) * 0.68;
+          const earR = Math.pow(dotR, 8.5) * 0.68;
+          const centerDip = Math.pow(dotCenter, 10.0) * 0.22;
+
+          v.x += dir.x * (earL + earR) * 0.72;
+          v.y += Math.max(0.15, dir.y) * (earL + earR) * 1.25 - centerDip;
+          v.z += dir.z * (earL + earR) * 0.42;
+
+          pos.setXYZ(i, v.x, v.y, v.z);
+        }
+
+        geo.computeVertexNormals();
+        return geo;
+      }
+
+      const creatureGroup = new THREE.Group();
+      scene.add(creatureGroup);
+
+      const mochiRig = new THREE.Group();
+      creatureGroup.add(mochiRig);
+
+      const baseBodyGeometry = createMochiBodyGeometry();
+
+      // -----------------------------------------------------------------------
+      // WebGL2 GLSL Shaders: 40-Layer Iridescent Volumetric Shell Fur
+      // -----------------------------------------------------------------------
+      const furVertexShader = /* glsl */ `
+        uniform float u_layer;
+        uniform float u_furLength;
+        uniform float u_time;
+        uniform float u_windSpeed;
+        uniform float u_curl;
+        uniform float u_earWiggle;
+        uniform vec3 u_combForce;
+        uniform vec3 u_brushPos;
+        uniform vec3 u_brushVel;
+        uniform float u_brushActive;
+
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vLocalPos;
+        varying vec3 vWorldPos;
+        varying vec3 vViewDir;
+        varying float vLayer;
+        varying float vEyeMask;
+
+        void main() {
+          vUv = uv;
+          vLayer = u_layer;
+          vLocalPos = position;
+
+          vec3 norm = normalize(normal);
+
+          // Attenuate fur length right inside the eye sockets & nose so glossy eyes & pink nose peek out clearly
+          vec3 leftEyeCenter = vec3(-0.42, 0.13, 1.58);
+          vec3 rightEyeCenter = vec3(0.42, 0.13, 1.58);
+          vec3 noseCenter = vec3(0.0, 0.02, 1.68);
+
+          float dLeftEye = distance(position, leftEyeCenter);
+          float dRightEye = distance(position, rightEyeCenter);
+          float dNose = distance(position, noseCenter);
+
+          float eyeSocketMask = smoothstep(0.18, 0.39, min(dLeftEye, dRightEye));
+          float noseSocketMask = smoothstep(0.09, 0.22, dNose);
+          vEyeMask = min(eyeSocketMask, noseSocketMask);
+
+          float localFurLen = u_furLength * 0.68 * mix(0.28, 1.0, vEyeMask);
+
+          // Expressive Ear Wiggle displacement on top ear mounds
+          float earMask = smoothstep(0.75, 1.45, position.y) * smoothstep(0.15, 0.55, abs(position.x));
+          float earSide = sign(position.x);
+          vec3 basePos = position;
+          basePos.x += sin(u_time * 6.5 + earSide * 1.2) * u_earWiggle * earMask * 1.4;
+          basePos.y += cos(u_time * 6.5) * u_earWiggle * earMask * 0.85;
+
+          // Base shell extrusion outward along vertex normal
+          vec3 displaced = basePos + norm * (u_layer * localFurLen);
+
+          // Natural gravity droop on cheeks/body & upward flare on top ear tufts
+          float bendWeight = pow(u_layer, 1.55);
+          float earRegion = smoothstep(0.85, 1.45, position.y);
+          vec3 gravityVec = mix(
+            vec3(norm.x * 0.18, -0.36, norm.z * 0.12),
+            vec3(norm.x * 0.34, 0.26, 0.0),
+            earRegion
+          );
+          displaced += gravityVec * bendWeight * localFurLen;
+
+          // Dynamic procedural wind breeze displacement (roots fixed, tips sway)
+          float windTipWeight = pow(u_layer, 2.0);
+          float wPhase = u_time * (1.8 + u_windSpeed * 1.4);
+          vec3 windDisp = vec3(
+            sin(wPhase + position.y * 2.3 + position.x * 1.7) * 0.16,
+            cos(wPhase * 0.85 + position.x * 2.5) * 0.08,
+            sin(wPhase * 1.1 + position.z * 2.1) * 0.11
+          ) * u_windSpeed * windTipWeight * u_furLength;
+          displaced += windDisp;
+
+          // Global & local combing / petting displacement (masked around eye sockets)
+          vec3 combDisp = u_combForce * pow(u_layer, 1.5) * u_furLength * 0.42;
+          if (u_brushActive > 0.01) {
+            float brushDist = distance(position, u_brushPos);
+            float brushInfluence = exp(-brushDist * brushDist * 1.6) * u_brushActive;
+            combDisp += u_brushVel * brushInfluence * pow(u_layer, 1.35) * u_furLength * 0.55;
+          }
+          combDisp -= norm * dot(combDisp, norm) * 0.65;
+          displaced += combDisp * smoothstep(0.25, 0.85, vEyeMask);
+
+          vec4 worldPosition = modelMatrix * vec4(displaced, 1.0);
+          vWorldPos = worldPosition.xyz;
+          vNormal = normalize(mat3(modelMatrix) * norm);
+          vViewDir = normalize(cameraPosition - worldPosition.xyz);
+
+          gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        }
+      `;
+
+      const furFragmentShader = /* glsl */ `
+        precision highp float;
+
+        uniform float u_layer;
+        uniform float u_furLength;
+        uniform float u_furDensity;
+        uniform float u_curl;
+        uniform float u_clumping;
+        uniform vec3 u_rootColor;
+        uniform vec3 u_tipColor;
+        uniform float u_roughness;
+        uniform float u_specular;
+        uniform vec3 u_keyLightColor;
+        uniform vec3 u_keyLightDir;
+        uniform float u_keyIntensity;
+        uniform float u_rimScatter;
+        uniform float u_coatMode;
+
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vLocalPos;
+        varying vec3 vWorldPos;
+        varying vec3 vViewDir;
+        varying float vLayer;
+        varying float vEyeMask;
+
+        vec3 hash33(vec3 p3) {
+          p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
+          p3 += dot(p3, p3.yxz + 33.33);
+          return fract((p3.xxy + p3.yxx) * p3.zyx);
+        }
+
+        // 3D Cellular Tuft + Strand Field (zero UV seams anywhere on the creature)
+        vec3 evaluateFurField(vec3 samplePos, float densityScale, float clumpAmount, float layer) {
+          float clumpFreq = mix(10.0, 22.0, densityScale);
+          vec3 clumpCoord = samplePos * clumpFreq;
+          vec3 clumpCell = floor(clumpCoord);
+          vec3 clumpFrac = fract(clumpCoord);
+
+          float minClumpDist = 8.0;
+          vec3 closestClumpCenter = vec3(0.0);
+          float clumpId = 0.0;
+
+          for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+              for (int z = -1; z <= 1; z++) {
+                vec3 neighbor = vec3(float(x), float(y), float(z));
+                vec3 rnd = hash33(clumpCell + neighbor);
+                vec3 pt = neighbor + 0.15 + 0.70 * rnd;
+                vec3 diff = pt - clumpFrac;
+                float d = dot(diff, diff);
+                if (d < minClumpDist) {
+                  minClumpDist = d;
+                  closestClumpCenter = (clumpCell + pt) / clumpFreq;
+                  clumpId = rnd.x;
+                }
+              }
+            }
+          }
+
+          float clumpDist = sqrt(minClumpDist);
+
+          // Pull samplePos toward the macro-clump center as layer increases (tuft convergence)
+          float pull = pow(layer, 0.85) * (0.28 + clumpAmount * 0.62);
+          vec3 pulledPos = mix(samplePos, closestClumpCenter, pull);
+
+          // Micro-strand high-frequency grid inside each tuft
+          float strandFreq = mix(34.0, 78.0, densityScale);
+          vec3 strandCoord = pulledPos * strandFreq;
+          vec3 strandCell = floor(strandCoord);
+          vec3 strandFrac = fract(strandCoord) - 0.5;
+
+          vec3 strandRnd = hash33(strandCell);
+          vec2 jitter = (strandRnd.xy - 0.5) * 0.55;
+          float strandDist = length(strandFrac.xy - jitter) * 1.72;
+
+          float tuftCone = clamp(1.0 - clumpDist * (1.04 + clumpAmount * 0.45), 0.0, 1.0);
+          float microFiber = clamp(1.0 - strandDist, 0.0, 1.0);
+
+          float strandHeight = mix(
+            tuftCone * (0.80 + 0.24 * clumpId),
+            microFiber * (0.64 + 0.36 * strandRnd.z),
+            0.46
+          );
+
+          return vec3(strandHeight, clumpId, strandRnd.y);
+        }
+
+        void main() {
+          if (vLayer > 0.05 && vEyeMask < 0.18) {
+            discard;
+          }
+
+          vec3 baseDir = normalize(vLocalPos);
+
+          // Additive Curl / Waviness coordinate distortion
+          float curlAmp = u_curl * 0.045 * pow(vLayer, 0.9);
+          vec3 curlWave = vec3(
+            sin(vLayer * 11.0 + baseDir.y * 14.0 + vUv.x * 12.0),
+            cos(vLayer * 11.0 + baseDir.x * 14.0 + vUv.y * 12.0),
+            sin(vLayer * 9.0 + baseDir.z * 14.0)
+          ) * curlAmp;
+
+          vec3 samplePos = baseDir + curlWave;
+          float densityNorm = clamp((u_furDensity - 10.0) / 90.0, 0.0, 1.0);
+
+          vec3 furSample = evaluateFurField(samplePos, densityNorm, u_clumping, vLayer);
+          float noiseVal = furSample.x;
+          float tuftVariation = furSample.y;
+          float fiberVariation = furSample.z;
+
+          if (vLayer > 0.01) {
+            float threshold = pow(vLayer, 0.83) * (1.03 - densityNorm * 0.22);
+            if (noiseVal < threshold) {
+              discard;
+            }
+          }
+
+          // Physical Hair Color Gradation (Root -> Electric Orchid Mid -> Pastel Tip)
+          float colorGrad = pow(vLayer, 0.66);
+          vec3 midColor = normalize(mix(u_rootColor, u_tipColor, 0.50) + vec3(0.19, 0.01, 0.25)) *
+                          length(mix(u_rootColor, u_tipColor, 0.64)) * 1.18;
+          vec3 baseCoatColor = mix(
+            mix(u_rootColor, midColor, smoothstep(0.0, 0.54, colorGrad)),
+            u_tipColor,
+            smoothstep(0.34, 1.0, colorGrad)
+          );
+
+          float strandShade = mix(0.88, 1.15, fiberVariation * 0.6 + tuftVariation * 0.4);
+          baseCoatColor *= strandShade;
+
+          float ambientOcclusion = mix(0.22, 1.0, pow(vLayer, 0.56));
+
+          vec3 N = normalize(vNormal);
+          vec3 V = normalize(vViewDir);
+          vec3 L = normalize(u_keyLightDir);
+
+          // Wrapped Diffuse + Subsurface Forward Scatter
+          float wrapNdotL = clamp((dot(N, L) + 0.55) / 1.55, 0.0, 1.0);
+          vec3 diffuse = baseCoatColor * u_keyLightColor * (0.44 + wrapNdotL * 0.74 * u_keyIntensity);
+
+          // Dual-Lobe Kajiya-Kay Anisotropic Hair Specular + Pearlescent Iridescence
+          vec3 T = normalize(cross(N, vec3(0.0, 1.0, 0.1)) + N * 0.35);
+          vec3 H = normalize(L + V);
+          float TdotH = dot(T, H);
+          float sinTH = sqrt(max(0.0, 1.0 - TdotH * TdotH));
+          float specPower = mix(96.0, 14.0, clamp(u_roughness, 0.05, 1.0));
+
+          // Primary white-rose specular lobe
+          float kajiyaPrimary = pow(sinTH, specPower) * u_specular * u_keyIntensity;
+          // Secondary shifted iridescent Marschner lobe
+          float TdotHShifted = clamp(TdotH + 0.18 * (tuftVariation - 0.5), -1.0, 1.0);
+          float sinTH2 = sqrt(max(0.0, 1.0 - TdotHShifted * TdotHShifted));
+          float kajiyaSecondary = pow(sinTH2, specPower * 0.45) * u_specular * 0.85;
+
+          vec3 iridescenceTint = mix(
+            vec3(0.45, 0.88, 1.0),
+            vec3(1.0, 0.62, 0.92),
+            0.5 + 0.5 * sin(dot(N, V) * 6.0 + tuftVariation * 4.0)
+          );
+
+          vec3 specularTerm = (
+            (u_keyLightColor * 0.65 + u_tipColor * 0.35) * kajiyaPrimary +
+            iridescenceTint * kajiyaSecondary
+          ) * pow(vLayer, 0.52);
+
+          // Iridescent Rim Scatter Halo along outer silhouette edges (HDR calibrated for UnrealBloomPass)
+          float fresnel = 1.0 - max(0.0, dot(N, V));
+          float tipBloomMask = smoothstep(0.62, 1.0, vLayer) * smoothstep(0.55, 0.96, fresnel);
+          float rimHalo = pow(fresnel, 2.25) * u_rimScatter * (0.30 + 0.76 * pow(vLayer, 0.52));
+          vec3 rimColor = mix(u_tipColor, iridescenceTint, 0.32 * (1.0 - u_coatMode)) *
+                          mix(vec3(1.0), u_keyLightColor, 0.35) *
+                          (rimHalo + tipBloomMask * u_rimScatter * 0.26 * (1.0 - u_coatMode * 0.4));
+
+          float modeBoost = mix(1.04, 0.97, u_coatMode);
+          vec3 coreCoat = clamp((diffuse * ambientOcclusion + specularTerm) * modeBoost, 0.0, 0.93);
+          vec3 finalColor = min(coreCoat + rimColor * modeBoost * 0.72, vec3(1.36));
+
+          gl_FragColor = vec4(finalColor, 1.0);
+        }
+      `;
+
+      // -----------------------------------------------------------------------
+      // Shared Uniform State & 40-Layer Shell Mesh Instantiation
+      // -----------------------------------------------------------------------
+      const SHELL_COUNT = 40;
+      const shellMaterials = [];
+      const shellMeshes = [];
+
+      const initialLightDir = computeKeyLightDirection(-74);
+
+      const sharedState = {
+        furLength: 0.62,
+        furDensity: 75,
+        curl: 0.23,
+        clumping: 0.35,
+        rootColor: new THREE.Color('#3B00E3'),
+        tipColor: new THREE.Color('#FF82A9'),
+        roughness: 0.77,
+        specular: 0.24,
+        keyLightColor: new THREE.Color('#FFFFFF'),
+        keyLightAngle: -74,
+        keyLightDir: new THREE.Vector3(...initialLightDir),
+        keyIntensity: 1.35,
+        rimScatter: 1.35,
+        windSpeed: 0.95,
+        coatMode: 0.0,
+        earWiggle: 0.025,
+        combForce: new THREE.Vector3(0, 0, 0),
+        brushPos: new THREE.Vector3(0, 0, 2),
+        brushVel: new THREE.Vector3(0, 0, 0),
+        brushActive: 0.0,
+      };
+
+      for (let i = 0; i < SHELL_COUNT; i++) {
+        const layerFraction = i / (SHELL_COUNT - 1);
+        const mat = new THREE.ShaderMaterial({
+          vertexShader: furVertexShader,
+          fragmentShader: furFragmentShader,
+          side: THREE.FrontSide,
+          depthTest: true,
+          depthWrite: true,
+          uniforms: {
+            u_layer: { value: layerFraction },
+            u_furLength: { value: sharedState.furLength },
+            u_furDensity: { value: sharedState.furDensity },
+            u_curl: { value: sharedState.curl },
+            u_clumping: { value: sharedState.clumping },
+            u_rootColor: { value: sharedState.rootColor },
+            u_tipColor: { value: sharedState.tipColor },
+            u_roughness: { value: sharedState.roughness },
+            u_specular: { value: sharedState.specular },
+            u_keyLightColor: { value: sharedState.keyLightColor },
+            u_keyLightDir: { value: sharedState.keyLightDir },
+            u_keyIntensity: { value: sharedState.keyIntensity },
+            u_rimScatter: { value: sharedState.rimScatter },
+            u_windSpeed: { value: sharedState.windSpeed },
+            u_coatMode: { value: sharedState.coatMode },
+            u_earWiggle: { value: sharedState.earWiggle },
+            u_time: { value: 0.0 },
+            u_combForce: { value: sharedState.combForce },
+            u_brushPos: { value: sharedState.brushPos },
+            u_brushVel: { value: sharedState.brushVel },
+            u_brushActive: { value: 0.0 },
+          },
+        });
+
+        const shellMesh = new THREE.Mesh(baseBodyGeometry, mat);
+        shellMesh.renderOrder = i;
+        mochiRig.add(shellMesh);
+        shellMaterials.push(mat);
+        shellMeshes.push(shellMesh);
+      }
+
+      // -----------------------------------------------------------------------
+      // Expressive Anime Eyes (with Cursor Gaze Tracking, Blinking & Star Mode)
+      // -----------------------------------------------------------------------
+      function createStarShapeGeometry() {
+        const shape = new THREE.Shape();
+        const outerR = 0.085;
+        const innerR = 0.028;
+        for (let i = 0; i < 8; i++) {
+          const r = i % 2 === 0 ? outerR : innerR;
+          const a = (i * Math.PI) / 4;
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (i === 0) shape.moveTo(x, y);
+          else shape.lineTo(x, y);
+        }
+        shape.closePath();
+        return new THREE.ShapeGeometry(shape);
+      }
+      const starCatchlightGeo = createStarShapeGeometry();
+
+      function createAnimeEye(sideSign) {
+        const eyeAnchor = new THREE.Group();
+        eyeAnchor.position.set(sideSign * 0.42, 0.13, 1.62);
+        eyeAnchor.rotation.y = sideSign * 0.16;
+        eyeAnchor.rotation.x = -0.05;
+
+        const eyeGroup = new THREE.Group();
+        eyeAnchor.add(eyeGroup);
+
+        // Glossy dark obsidian/indigo glass eyeball
+        const eyeGeo = new THREE.SphereGeometry(0.22, 32, 32);
+        eyeGeo.scale(0.95, 1.14, 0.72);
+        const eyeMat = new THREE.MeshStandardMaterial({
+          color: 0x0e061c,
+          roughness: 0.06,
+          metalness: 0.18,
+        });
+        const eyeBall = new THREE.Mesh(eyeGeo, eyeMat);
+        eyeGroup.add(eyeBall);
+
+        // Gaze-tracking inner highlight rig
+        const gazeGroup = new THREE.Group();
+        eyeGroup.add(gazeGroup);
+
+        // Large upper-left white specular catchlight
+        const mainHighlightGeo = new THREE.SphereGeometry(0.068, 20, 20);
+        mainHighlightGeo.scale(1.0, 1.12, 0.45);
+        const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const mainHighlight = new THREE.Mesh(mainHighlightGeo, highlightMat);
+        mainHighlight.position.set(-0.058, 0.078, 0.148);
+        gazeGroup.add(mainHighlight);
+
+        // 4-point Starry-Eyed catchlight (visible in Starry mood)
+        const starMesh = new THREE.Mesh(
+          starCatchlightGeo,
+          new THREE.MeshBasicMaterial({ color: 0xfef08a, side: THREE.DoubleSide })
+        );
+        starMesh.position.set(-0.048, 0.072, 0.168);
+        starMesh.visible = false;
+        gazeGroup.add(starMesh);
+
+        // Secondary lower-right white catchlight dot
+        const subHighlightGeo = new THREE.SphereGeometry(0.032, 16, 16);
+        subHighlightGeo.scale(1.0, 1.0, 0.45);
+        const subHighlight = new THREE.Mesh(subHighlightGeo, highlightMat);
+        subHighlight.position.set(0.068, -0.062, 0.146);
+        gazeGroup.add(subHighlight);
+
+        // Subtle violet lower iris glow
+        const irisGeo = new THREE.SphereGeometry(0.088, 16, 16);
+        irisGeo.scale(1.12, 0.55, 0.35);
+        const irisMat = new THREE.MeshBasicMaterial({ color: 0x7c4dff });
+        const irisGlow = new THREE.Mesh(irisGeo, irisMat);
+        irisGlow.position.set(0.0, -0.085, 0.132);
+        gazeGroup.add(irisGlow);
+
+        return { eyeAnchor, eyeGroup, gazeGroup, mainHighlight, starMesh };
+      }
+
+      const leftEyeRig = createAnimeEye(-1);
+      const rightEyeRig = createAnimeEye(1);
+      mochiRig.add(leftEyeRig.eyeAnchor);
+      mochiRig.add(rightEyeRig.eyeAnchor);
+
+      // Cute pastel-pink button nose between eyes
+      const noseGeo = new THREE.SphereGeometry(0.082, 24, 24);
+      noseGeo.scale(1.25, 0.88, 0.85);
+      const noseMat = new THREE.MeshBasicMaterial({ color: 0xffb3d1 });
+      const noseMesh = new THREE.Mesh(noseGeo, noseMat);
+      noseMesh.position.set(0.0, 0.02, 1.72);
+      mochiRig.add(noseMesh);
+
+      // Cute anime happy smile arc right below the button nose (visible in Happy mood)
+      const happySmileGeo = new THREE.TorusGeometry(0.105, 0.024, 12, 24, Math.PI);
+      const happySmileMat = new THREE.MeshBasicMaterial({ color: 0xffd6e7 });
+      const happySmileArc = new THREE.Mesh(happySmileGeo, happySmileMat);
+      happySmileArc.rotation.z = Math.PI;
+      happySmileArc.position.set(0.0, -0.045, 1.78);
+      happySmileArc.visible = false;
+      mochiRig.add(happySmileArc);
+
+      // Reactive rosy cheek blush spots below the eyes
+      const blushMat = new THREE.MeshBasicMaterial({
+        color: 0xf472b6,
+        transparent: true,
+        opacity: 0.65,
+      });
+      function createCheekBlush(sideSign) {
+        const blushGeo = new THREE.SphereGeometry(0.062, 16, 16);
+        blushGeo.scale(1.4, 0.75, 0.4);
+        const blush = new THREE.Mesh(blushGeo, blushMat);
+        blush.position.set(sideSign * 0.49, -0.08, 1.66);
+        return blush;
+      }
+      mochiRig.add(createCheekBlush(-1));
+      mochiRig.add(createCheekBlush(1));
+
+      // Scene lights for the physical eye spheres & 3D stage props
+      const eyeKeyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+      eyeKeyLight.position.set(-2.5, 2.5, 4.0);
+      scene.add(eyeKeyLight);
+
+      const eyeAmbientLight = new THREE.AmbientLight(0xd8b4fe, 0.9);
+      scene.add(eyeAmbientLight);
+
+      // -----------------------------------------------------------------------
+      // Interactive Raycasting, Petting/Combing, Boop Spring & Gaze Tracking
+      // -----------------------------------------------------------------------
+      const raycaster = new THREE.Raycaster();
+      const pointerNDC = new THREE.Vector2(0, 0);
+      const targetGazeOffset = new THREE.Vector2(0, 0);
+      const currentGazeOffset = new THREE.Vector2(0, 0);
+
+      let isDraggingCreature = false;
+      let isOrbitingCamera = false;
+      let lastPointerPos = { x: 0, y: 0 };
+      let dragDistanceTotal = 0;
+      let petJoyIntensity = 0.0;
+      let currentMood = 'calm';
+
+      // Blinking timer state
+      let blinkTimer = 2.8;
+      let blinkProgress = 0.0;
+      let isBlinking = false;
+
+      const cameraOrbit = {
+        theta: 0.0,
+        phi: 0.02,
+        radius: 7.15,
+        targetTheta: 0.0,
+        targetPhi: 0.02,
+        targetRadius: 7.15,
+      };
+
+      let boopSpring = { displacement: 0.0, velocity: 0.0 };
+
+      function triggerBoop(impulse = 0.85, worldPoint = null, emitBurst = false) {
+        boopSpring.velocity += impulse * 8.5;
+        boopSpring.displacement = Math.min(1.1, boopSpring.displacement + impulse * 0.42);
+        if (emitBurst) {
+          petJoyIntensity = Math.min(1.0, petJoyIntensity + 0.45);
+          spawnBoopBurst(worldPoint || new THREE.Vector3(0, 0.2, 1.8), 18);
+        }
+      }
+
+      const hitProxyMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(2.05, 24, 24),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      mochiRig.add(hitProxyMesh);
+
+      const canvasEl = renderer.domElement;
+      canvasEl.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      canvasEl.addEventListener('pointerdown', (e) => {
+        lastPointerPos = { x: e.clientX, y: e.clientY };
+        dragDistanceTotal = 0;
+
+        const rect = canvasEl.getBoundingClientRect();
+        pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        if (e.button === 2 || e.button === 1) {
+          isOrbitingCamera = true;
+          return;
+        }
+
+        raycaster.setFromCamera(pointerNDC, camera);
+        const hits = raycaster.intersectObject(hitProxyMesh, false);
+        if (hits.length > 0) {
+          isDraggingCreature = true;
+          const localHit = mochiRig.worldToLocal(hits[0].point.clone());
+          sharedState.brushPos.copy(localHit);
+          sharedState.brushActive = 1.0;
+        } else {
+          isOrbitingCamera = true;
+        }
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        const dx = e.clientX - lastPointerPos.x;
+        const dy = e.clientY - lastPointerPos.y;
+        lastPointerPos = { x: e.clientX, y: e.clientY };
+        dragDistanceTotal += Math.hypot(dx, dy);
+
+        const rect = canvasEl.getBoundingClientRect();
+        pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // Update Cursor Eye-Tracking Target
+        const [gx, gy] = computeEyeGazeOffset(pointerNDC.x, pointerNDC.y, 0.055);
+        targetGazeOffset.set(gx, gy);
+
+        if (isDraggingCreature) {
+          raycaster.setFromCamera(pointerNDC, camera);
+          const hits = raycaster.intersectObject(hitProxyMesh, false);
+          if (hits.length > 0) {
+            const localHit = mochiRig.worldToLocal(hits[0].point.clone());
+            sharedState.brushPos.copy(localHit);
+            if (Math.random() < 0.25) {
+              spawnBoopBurst(hits[0].point, 2);
+            }
+          }
+
+          const updatedComb = updateCombVector(
+            [sharedState.combForce.x, sharedState.combForce.y, sharedState.combForce.z],
+            dx * 0.025,
+            dy * 0.025,
+            1.15
+          );
+          sharedState.combForce.set(updatedComb[0], updatedComb[1], updatedComb[2]);
+          sharedState.brushVel.set(dx * 0.06, -dy * 0.06, 0.0);
+          sharedState.brushActive = 1.0;
+          petJoyIntensity = Math.min(1.0, petJoyIntensity + 0.08);
+        } else if (isOrbitingCamera) {
+          cameraOrbit.targetTheta -= dx * 0.0075;
+          cameraOrbit.targetPhi = Math.max(
+            -0.75,
+            Math.min(0.85, cameraOrbit.targetPhi + dy * 0.0065)
+          );
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (isDraggingCreature && dragDistanceTotal < 8) {
+          raycaster.setFromCamera(pointerNDC, camera);
+          const hits = raycaster.intersectObject(hitProxyMesh, false);
+          triggerBoop(0.95, hits.length > 0 ? hits[0].point : null, true);
+        }
+        isDraggingCreature = false;
+        isOrbitingCamera = false;
+      });
+
+      canvasEl.addEventListener(
+        'wheel',
+        (e) => {
+          e.preventDefault();
+          cameraOrbit.targetRadius = Math.max(
+            4.2,
+            Math.min(9.5, cameraOrbit.targetRadius + e.deltaY * 0.0035)
+          );
+        },
+        { passive: false }
+      );
+
+      // -----------------------------------------------------------------------
+      // UI Control Bindings (Sliders, Color Pickers, Presets, Moods, Stages)
+      // -----------------------------------------------------------------------
+      function syncUniformsToAllShells() {
+        for (let i = 0; i < SHELL_COUNT; i++) {
+          const u = shellMaterials[i].uniforms;
+          u.u_furLength.value = sharedState.furLength;
+          u.u_furDensity.value = sharedState.furDensity;
+          u.u_curl.value = sharedState.curl;
+          u.u_clumping.value = sharedState.clumping;
+          u.u_roughness.value = sharedState.roughness;
+          u.u_specular.value = sharedState.specular;
+          u.u_keyIntensity.value = sharedState.keyIntensity;
+          u.u_rimScatter.value = sharedState.rimScatter;
+          u.u_windSpeed.value = sharedState.windSpeed;
+          u.u_coatMode.value = sharedState.coatMode;
+        }
+      }
+
+      const sliderFurLength = document.getElementById('slider-fur-length');
+      const valFurLength = document.getElementById('val-fur-length');
+      const sliderFurDensity = document.getElementById('slider-fur-density');
+      const valFurDensity = document.getElementById('val-fur-density');
+      const sliderCurl = document.getElementById('slider-curl');
+      const valCurl = document.getElementById('val-curl');
+      const sliderClumping = document.getElementById('slider-clumping');
+      const valClumping = document.getElementById('val-clumping');
+      const colorRoot = document.getElementById('color-root');
+      const colorTip = document.getElementById('color-tip');
+      const sliderRoughness = document.getElementById('slider-roughness');
+      const valRoughness = document.getElementById('val-roughness');
+      const sliderSpecular = document.getElementById('slider-specular');
+      const valSpecular = document.getElementById('val-specular');
+      const colorKeyLight = document.getElementById('color-keylight');
+      const sliderLightAngle = document.getElementById('slider-light-angle');
+      const valLightAngle = document.getElementById('val-light-angle');
+      const sliderKeyIntensity = document.getElementById('slider-key-intensity');
+      const valKeyIntensity = document.getElementById('val-key-intensity');
+      const sliderRimScatter = document.getElementById('slider-rim-scatter');
+      const valRimScatter = document.getElementById('val-rim-scatter');
+      const sliderWind = document.getElementById('slider-wind');
+      const valWind = document.getElementById('val-wind');
+
+      sliderFurLength.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.furLength = v;
+        valFurLength.textContent = formatFurLengthLabel(v);
+        syncUniformsToAllShells();
+      });
+
+      sliderFurDensity.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.furDensity = v;
+        valFurDensity.textContent = formatFurDensityLabel(v);
+        syncUniformsToAllShells();
+      });
+
+      sliderCurl.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.curl = v / 100.0;
+        valCurl.textContent = `${Math.round(v)}%`;
+        syncUniformsToAllShells();
+      });
+
+      sliderClumping.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.clumping = v / 100.0;
+        valClumping.textContent = `${Math.round(v)}%`;
+        syncUniformsToAllShells();
+      });
+
+      colorRoot.addEventListener('input', (e) => {
+        sharedState.rootColor.set(e.target.value);
+        studioFloorMat.color.set(e.target.value);
+        updateBloomHaloTexture(colorRoot.value, colorTip.value);
+      });
+
+      colorTip.addEventListener('input', (e) => {
+        sharedState.tipColor.set(e.target.value);
+        petalMat.color.set(e.target.value);
+        burstMat.color.set(e.target.value);
+        updateBloomHaloTexture(colorRoot.value, colorTip.value);
+      });
+
+      sliderRoughness.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.roughness = v;
+        valRoughness.textContent = v.toFixed(2);
+        syncUniformsToAllShells();
+      });
+
+      sliderSpecular.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.specular = v;
+        valSpecular.textContent = v.toFixed(2);
+        syncUniformsToAllShells();
+      });
+
+      colorKeyLight.addEventListener('input', (e) => {
+        sharedState.keyLightColor.set(e.target.value);
+        eyeKeyLight.color.set(e.target.value);
+      });
+
+      sliderLightAngle.addEventListener('input', (e) => {
+        const deg = parseFloat(e.target.value);
+        sharedState.keyLightAngle = deg;
+        valLightAngle.textContent = `${Math.round(deg)}°`;
+        const dir = computeKeyLightDirection(deg);
+        sharedState.keyLightDir.set(dir[0], dir[1], dir[2]);
+        eyeKeyLight.position.set(dir[0] * 4.0, dir[1] * 4.0, dir[2] * 4.0);
+      });
+
+      sliderKeyIntensity.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.keyIntensity = v;
+        valKeyIntensity.textContent = v.toFixed(2);
+        eyeKeyLight.intensity = v * 1.6;
+        syncUniformsToAllShells();
+      });
+
+      sliderRimScatter.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.rimScatter = v;
+        valRimScatter.textContent = v.toFixed(2);
+        bloomSpriteMat.opacity = Math.min(0.95, 0.35 + v * 0.32);
+        syncBloomPass();
+        syncUniformsToAllShells();
+      });
+
+      sliderWind.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        sharedState.windSpeed = v;
+        valWind.textContent = v.toFixed(2);
+        syncUniformsToAllShells();
+      });
+
+      // Quick Presets Handler
+      const presetButtons = document.querySelectorAll('.preset-btn');
+      function applyPreset(presetId) {
+        const p = FUR_PRESETS[presetId];
+        if (!p) return;
+
+        sharedState.rootColor.set(p.rootColor);
+        sharedState.tipColor.set(p.tipColor);
+        sharedState.furLength = p.furLength;
+        sharedState.furDensity = p.furDensity;
+        sharedState.curl = p.curl / 100.0;
+        sharedState.clumping = p.clumping / 100.0;
+        sharedState.roughness = p.roughness;
+        sharedState.specular = p.specular;
+        sharedState.rimScatter = p.rimScatter;
+
+        colorRoot.value = p.rootColor;
+        colorTip.value = p.tipColor;
+        sliderFurLength.value = String(p.furLength);
+        valFurLength.textContent = formatFurLengthLabel(p.furLength);
+        sliderFurDensity.value = String(p.furDensity);
+        valFurDensity.textContent = formatFurDensityLabel(p.furDensity);
+        sliderCurl.value = String(p.curl);
+        valCurl.textContent = `${p.curl}%`;
+        sliderClumping.value = String(p.clumping);
+        valClumping.textContent = `${p.clumping}%`;
+        sliderRoughness.value = String(p.roughness);
+        valRoughness.textContent = p.roughness.toFixed(2);
+        sliderSpecular.value = String(p.specular);
+        valSpecular.textContent = p.specular.toFixed(2);
+        sliderRimScatter.value = String(p.rimScatter);
+        valRimScatter.textContent = p.rimScatter.toFixed(2);
+
+        studioFloorMat.color.set(p.rootColor);
+        petalMat.color.set(p.tipColor);
+        burstMat.color.set(p.tipColor);
+        updateBloomHaloTexture(p.rootColor, p.tipColor);
+
+        presetButtons.forEach((btn) => {
+          const isMatch = btn.dataset.preset === presetId;
+          btn.className = isMatch
+            ? 'preset-btn flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/85 border border-[#FF82A9]/60 text-white text-[11px] font-medium transition-all cursor-pointer truncate'
+            : 'preset-btn flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/55 hover:bg-zinc-700/75 border border-white/10 text-zinc-200 text-[11px] font-medium transition-all cursor-pointer truncate';
+        });
+
+        syncBloomPass();
+        syncUniformsToAllShells();
+        triggerBoop(0.45);
+      }
+
+      presetButtons.forEach((btn) => {
+        btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+      });
+
+      // Mood Expression Selector Handler
+      const moodButtons = document.querySelectorAll('.mood-btn');
+      const valMoodStatus = document.getElementById('val-mood-status');
+
+      function applyMoodExpression(moodId) {
+        const m = MOOD_CONFIGS[moodId];
+        if (!m) return;
+        currentMood = moodId;
+        valMoodStatus.textContent = `${m.label} · Eye-Track`;
+
+        leftEyeRig.starMesh.visible = m.starCatchlight;
+        rightEyeRig.starMesh.visible = m.starCatchlight;
+        leftEyeRig.mainHighlight.visible = !m.starCatchlight;
+        rightEyeRig.mainHighlight.visible = !m.starCatchlight;
+        happySmileArc.visible = Boolean(m.happyArc);
+
+        moodButtons.forEach((btn) => {
+          const active = btn.dataset.mood === moodId;
+          btn.className = active
+            ? 'mood-btn py-1.5 px-1.5 rounded-xl text-[10.5px] font-semibold border transition-all cursor-pointer bg-[#3B1D31]/85 border-[#FF82A9]/60 text-white text-center truncate'
+            : 'mood-btn py-1.5 px-1.5 rounded-xl text-[10.5px] font-medium border transition-all cursor-pointer bg-zinc-800/55 border-white/10 text-zinc-300 hover:text-white text-center truncate';
+        });
+
+        triggerBoop(0.38, null, false);
+      }
+
+      moodButtons.forEach((btn) => {
+        btn.addEventListener('click', () => applyMoodExpression(btn.dataset.mood));
+      });
+
+      // Coat Materials & Top WebGPU/WebGL Toggle Synchronization
+      const tabWebgpu = document.getElementById('tab-webgpu');
+      const tabWebgl = document.getElementById('tab-webgl');
+      const btnTopFurMode = document.getElementById('btn-top-fur-mode');
+      const topFurModeLabel = document.getElementById('top-fur-mode-label');
+
+      function setCoatMaterialMode(mode) {
+        const isWebGPU = mode === 'webgpu';
+        sharedState.coatMode = isWebGPU ? 0.0 : 1.0;
+
+        tabWebgpu.setAttribute('aria-selected', String(isWebGPU));
+        tabWebgl.setAttribute('aria-selected', String(!isWebGPU));
+
+        const activeClass =
+          'coat-tab py-1.5 px-2.5 rounded-xl text-[11px] font-medium border transition-all cursor-pointer bg-[#3B1D31]/85 border-[#FF82A9]/60 text-white shadow-sm';
+        const inactiveClass =
+          'coat-tab py-1.5 px-2.5 rounded-xl text-[11px] font-medium border transition-all cursor-pointer bg-zinc-800/55 border-white/10 text-zinc-300 hover:text-white';
+
+        tabWebgpu.className = isWebGPU ? activeClass : inactiveClass;
+        tabWebgl.className = !isWebGPU ? activeClass : inactiveClass;
+
+        topFurModeLabel.textContent = isWebGPU ? 'WebGPU Fur: ON' : 'WebGL Mode: ON';
+        btnTopFurMode.setAttribute('aria-pressed', String(isWebGPU));
+
+        syncBloomPass();
+        syncUniformsToAllShells();
+      }
+
+      tabWebgpu.addEventListener('click', () => setCoatMaterialMode('webgpu'));
+      tabWebgl.addEventListener('click', () => setCoatMaterialMode('webgl'));
+      btnTopFurMode.addEventListener('click', () => {
+        setCoatMaterialMode(sharedState.coatMode === 0.0 ? 'webgl' : 'webgpu');
+      });
+
+      // Top Environment Mode Switcher ("Studio", "Cloud Sky", "Cozy Desk", "AR View")
+      const envButtons = document.querySelectorAll('.env-btn');
+      const arOverlay = document.getElementById('ar-overlay');
+
+      function setEnvironmentMode(envKey) {
+        envButtons.forEach((btn) => {
+          const active = btn.dataset.env === envKey;
+          const dot = btn.querySelector('.env-dot');
+          if (active) {
+            btn.className =
+              'env-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 whitespace-nowrap bg-[#FFD1DF] text-zinc-950 shadow-sm cursor-pointer';
+            if (dot) dot.className = 'env-dot w-1.5 h-1.5 rounded-full bg-[#E11D74]';
+          } else {
+            btn.className =
+              'env-btn flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 whitespace-nowrap text-zinc-400 hover:text-zinc-100 cursor-pointer';
+            if (dot) dot.className = 'env-dot w-1.5 h-1.5 rounded-full bg-zinc-600';
+          }
+        });
+
+        arOverlay.classList.toggle('hidden', envKey !== 'ar');
+        arOverlay.classList.toggle('flex', envKey === 'ar');
+
+        stageStudioGroup.visible = envKey === 'studio';
+        stageCloudGroup.visible = envKey === 'cloud';
+        stageDeskGroup.visible = envKey === 'desk';
+        stageArGroup.visible = envKey === 'ar';
+
+        if (envKey === 'studio') {
+          scene.background.setHex(0x000000);
+          dustMat.opacity = 0.42;
+          petalMat.opacity = 0.65;
+        } else if (envKey === 'cloud') {
+          scene.background.setHex(0x0b1026);
+          dustMat.opacity = 0.62;
+          petalMat.opacity = 0.85;
+        } else if (envKey === 'desk') {
+          scene.background.setHex(0x10080c);
+          dustMat.opacity = 0.35;
+          petalMat.opacity = 0.45;
+        } else if (envKey === 'ar') {
+          scene.background.setHex(0x03070e);
+          dustMat.opacity = 0.5;
+          petalMat.opacity = 0.3;
+        }
+      }
+
+      envButtons.forEach((btn) => {
+        btn.addEventListener('click', () => setEnvironmentMode(btn.dataset.env));
+      });
+
+      // Right Panel Collapse / Expand Toggle
+      const btnCollapsePanel = document.getElementById('btn-collapse-panel');
+      const panelBody = document.getElementById('panel-body');
+      let isPanelCollapsed = window.innerWidth < 768;
+
+      function applyPanelCollapsedState() {
+        panelBody.classList.toggle('hidden', isPanelCollapsed);
+        btnCollapsePanel.textContent = isPanelCollapsed ? 'Expand' : 'Collapse';
+        btnCollapsePanel.setAttribute('aria-expanded', String(!isPanelCollapsed));
+      }
+      applyPanelCollapsedState();
+
+      btnCollapsePanel.addEventListener('click', () => {
+        isPanelCollapsed = !isPanelCollapsed;
+        applyPanelCollapsedState();
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+        bloomPass.resolution.set(
+          Math.max(1, Math.floor(window.innerWidth * bloomResolutionScale)),
+          Math.max(1, Math.floor(window.innerHeight * bloomResolutionScale))
+        );
+        cameraLookTarget.x = window.innerWidth < 768 ? 0.0 : 0.34;
+        if (window.innerWidth < 768 && !isPanelCollapsed) {
+          isPanelCollapsed = true;
+          applyPanelCollapsedState();
+        } else if (window.innerWidth >= 768 && isPanelCollapsed) {
+          isPanelCollapsed = false;
+          applyPanelCollapsedState();
+        }
+      });
+
+      // -----------------------------------------------------------------------
+      // Main Animation Loop (with Software-WebGL fenceSync pacing support)
+      // -----------------------------------------------------------------------
+      let lastTimeMs = performance.now();
+
+      function afterDraw(cb) {
+        const gl = renderer.getContext();
+        if (gl && typeof gl.fenceSync === 'function') {
+          const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+          gl.flush();
+          const poll = () => {
+            const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
+            if (state === gl.UNSIGNALED) {
+              window.setTimeout(poll, 5);
+            } else {
+              if (sync) gl.deleteSync(sync);
+              window.setTimeout(cb, 80);
+            }
+          };
+          window.setTimeout(poll, 5);
+        } else {
+          window.setTimeout(cb, 80);
+        }
+      }
+
+      function animate() {
+        const nowMs = performance.now();
+        const dt = Math.min((nowMs - lastTimeMs) * 0.001, 0.05);
+        lastTimeMs = nowMs;
+        const elapsedSec = nowMs * 0.001;
+
+        const moodCfg = MOOD_CONFIGS[currentMood] || MOOD_CONFIGS.calm;
+
+        // 1. Decay Petting Joy & Update Ear Wiggle + Shader Uniforms
+        petJoyIntensity = Math.max(0.0, petJoyIntensity - dt * 0.55);
+        sharedState.brushActive = Math.max(0.0, sharedState.brushActive - dt * 1.8);
+        if (!isDraggingCreature) {
+          sharedState.combForce.multiplyScalar(Math.pow(0.985, dt * 60.0));
+        }
+
+        const activeEarWiggle = moodCfg.earWiggleAmp + petJoyIntensity * 0.075;
+
+        for (let i = 0; i < SHELL_COUNT; i++) {
+          const u = shellMaterials[i].uniforms;
+          u.u_time.value = elapsedSec;
+          u.u_brushActive.value = sharedState.brushActive;
+          u.u_earWiggle.value = activeEarWiggle;
+        }
+
+        // 2. Cursor Eye-Tracking, Natural Blinking & Mood Eyelid Posture
+        const eyeDamp = 1.0 - Math.exp(-12.0 * dt);
+        currentGazeOffset.lerp(targetGazeOffset, eyeDamp);
+
+        leftEyeRig.gazeGroup.position.set(currentGazeOffset.x, currentGazeOffset.y, 0.0);
+        rightEyeRig.gazeGroup.position.set(currentGazeOffset.x, currentGazeOffset.y, 0.0);
+
+        // Rotate Starry catchlight gently
+        if (moodCfg.starCatchlight) {
+          leftEyeRig.starMesh.rotation.z = elapsedSec * 1.8;
+          rightEyeRig.starMesh.rotation.z = -elapsedSec * 1.8;
+        }
+
+        // Periodic Natural Blinking
+        blinkTimer -= dt;
+        if (blinkTimer <= 0 && !isBlinking) {
+          isBlinking = true;
+          blinkProgress = 0.0;
+          blinkTimer = 3.2 + Math.random() * 2.4;
+        }
+        let blinkFactor = 1.0;
+        if (isBlinking) {
+          blinkProgress += dt * 7.5;
+          if (blinkProgress >= 1.0) {
+            isBlinking = false;
+            blinkFactor = 1.0;
+          } else {
+            blinkFactor = Math.abs(Math.cos(blinkProgress * Math.PI));
+          }
+        }
+
+        // Combine Mood Eye Scale, Petting Happy Squint & Blinking
+        const petSquint = 1.0 - petJoyIntensity * 0.42;
+        const targetEyeY = Math.max(0.08, moodCfg.eyeScaleY * petSquint * blinkFactor);
+        leftEyeRig.eyeGroup.scale.set(moodCfg.eyeScaleX, targetEyeY, 1.0);
+        rightEyeRig.eyeGroup.scale.set(moodCfg.eyeScaleX, targetEyeY, 1.0);
+
+        blushMat.opacity = Math.min(1.0, moodCfg.blushOpacity + petJoyIntensity * 0.32);
+
+        // 3. Step Boop Damped Harmonic Spring Physics + Subtle Curiosity Head Tilt
+        const boopResult = stepBoopSpring(boopSpring, dt);
+        boopSpring = boopResult.state;
+
+        const breatheSpeed = currentMood === 'sleepy' ? 1.25 : 2.15;
+        const breathe = Math.sin(elapsedSec * breatheSpeed) * 0.016;
+        mochiRig.scale.set(
+          boopResult.scale[0] * (1.0 - breathe * 0.4),
+          boopResult.scale[1] * (1.0 + breathe),
+          boopResult.scale[2] * (1.0 - breathe * 0.4)
+        );
+        mochiRig.position.y = (boopResult.scale[1] - 1.0) * 0.45 + breathe * 0.3;
+        mochiRig.rotation.y = currentGazeOffset.x * 1.4;
+        mochiRig.rotation.x = -currentGazeOffset.y * 1.1;
+
+        // 4. Animate Floating Sakura Petals & Boop Burst Particles
+        const windFactor = 0.35 + sharedState.windSpeed * 0.85;
+        for (let i = 0; i < PETAL_COUNT; i++) {
+          const p = petalData[i];
+          p.x += p.vx * windFactor * dt;
+          p.y += p.vy * dt + Math.sin(elapsedSec * 1.8 + p.phase) * 0.003;
+          p.rx += p.spin * dt;
+          p.ry += p.spin * 0.8 * dt;
+
+          if (p.x > 5.2) p.x = -5.2;
+          if (p.y < -3.6) p.y = 3.6;
+
+          dummyObj.position.set(p.x, p.y, p.z);
+          dummyObj.rotation.set(p.rx, p.ry, p.rz);
+          dummyObj.scale.setScalar(p.scale);
+          dummyObj.updateMatrix();
+          petalInstanced.setMatrixAt(i, dummyObj.matrix);
+        }
+        petalInstanced.instanceMatrix.needsUpdate = true;
+
+        // Update Boop Burst Particles
+        for (let i = 0; i < BURST_MAX; i++) {
+          const b = burstParticles[i];
+          if (b.active) {
+            b.life -= dt;
+            if (b.life <= 0) {
+              b.active = false;
+              dummyObj.scale.set(0, 0, 0);
+            } else {
+              b.x += b.vx * dt;
+              b.y += b.vy * dt;
+              b.z += b.vz * dt;
+              b.vy -= 3.2 * dt; // gentle gravity
+              const lifeRatio = b.life / b.maxLife;
+              dummyObj.position.set(b.x, b.y, b.z);
+              dummyObj.rotation.set(elapsedSec * 4.0, elapsedSec * 3.0, i);
+              dummyObj.scale.setScalar(b.scale * lifeRatio);
+            }
+            dummyObj.updateMatrix();
+            burstInstanced.setMatrixAt(i, dummyObj.matrix);
+          }
+        }
+        burstInstanced.instanceMatrix.needsUpdate = true;
+
+        // Rotate AR rings gently when in AR View
+        if (stageArGroup.visible) {
+          arInnerRing.rotation.z = elapsedSec * 0.5;
+        }
+
+        // 5. Smooth Camera Orbit Interpolation
+        const dampFactor = 1.0 - Math.exp(-10.0 * dt);
+        cameraOrbit.theta += (cameraOrbit.targetTheta - cameraOrbit.theta) * dampFactor;
+        cameraOrbit.phi += (cameraOrbit.targetPhi - cameraOrbit.phi) * dampFactor;
+        cameraOrbit.radius += (cameraOrbit.targetRadius - cameraOrbit.radius) * dampFactor;
+
+        const cosPhi = Math.cos(cameraOrbit.phi);
+        const portraitScale =
+          camera.aspect < 1.0 ? Math.min(1.42, 0.85 / Math.max(0.42, camera.aspect)) : 1.0;
+        const effectiveRadius = cameraOrbit.radius * portraitScale;
+        camera.position.x =
+          cameraLookTarget.x + Math.sin(cameraOrbit.theta) * cosPhi * effectiveRadius;
+        camera.position.y =
+          cameraLookTarget.y + Math.sin(cameraOrbit.phi) * effectiveRadius;
+        camera.position.z =
+          cameraLookTarget.z + Math.cos(cameraOrbit.theta) * cosPhi * effectiveRadius;
+        camera.lookAt(cameraLookTarget);
+
+        composer.render(dt);
+
+        if (isSoftwareGl) {
+          afterDraw(animate);
+        } else {
+          requestAnimationFrame(animate);
+        }
+      }
+
+      animate();
+    </script>
+  </body>
+</html>
